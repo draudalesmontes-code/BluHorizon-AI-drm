@@ -6,7 +6,7 @@ _model = SentenceTransformer("all-MiniLM-L6-v2")
 _tokenizer = tiktoken.get_encoding("cl100k_base")
 
 def embed_text(text:str)-> list[float]:
-   return _model.encode(text).tolist
+   return _model.encode(text).tolist()
 
 def embed_batch(texts: list[str]) -> list[list[float]]:
    return _model.encode(texts).tolist()
@@ -18,8 +18,8 @@ def chunk_text(text:str, max_tokens:int = 300, overlap:int = 50) -> list[str]:
    while start < len(token_ids):
     end = start + max_tokens
     chunk_ids = token_ids[start:end]
-    chunk_text = _tokenizer.decode(chunk_ids).strip()
-    chunks.append(chunk_text)
+    chunk = _tokenizer.decode(chunk_ids).strip()
+    chunks.append(chunk)
     start += max_tokens - overlap
 
    return [c for c in chunks if c]

@@ -5,7 +5,7 @@ from config import settings
 _DB_FILE = os.path.join(settings.faiss_index_path,"chunks.db")
 
 def _get_connection() -> sqlite3.Connection:
-    os.makedirs(_DB_FILE,exist_ok=False)
+    os.makedirs(settings.faiss_index_path, exist_ok=True)
     conn = sqlite3.connect(_DB_FILE, check_same_thread=False)
     conn.execute("""
                 CREATE TABLE IF NOT EXISTS chunks (
@@ -20,7 +20,7 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
-_conn = _get_connection
+_conn = _get_connection()
 
 def insert_chunks(chunks: list[dict]) -> None:
     _conn.executemany(
@@ -52,7 +52,7 @@ def fetch_by_ids(chunk_ids:list[int]) -> dict[int,dict]:
     
     placehorder_ids = ",".join("?"*len(chunk_ids))
 
-    rows = _conn.execute(f"SELECT id, text, source, doc_id FROM chunks WHERE id IN {placehorder_ids}"
+    rows = _conn.execute(f"SELECT id, text, source, doc_id FROM chunks WHERE id IN ({placehorder_ids})"
                   ,chunk_ids
                   ).fetchall()
     
@@ -78,7 +78,7 @@ def delete_by_doc_id(doc_id: str) -> int:
     return cursor.rowcount
 
 def get_stats() -> dict:
-    total = _conn.execute("SELECT COUNT(*) FROM chunks").fetchone[0]
+    total = _conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
     sources = _conn.execute(
         "SELECT DISTINCT source FROM chunks WHERE source IS NOT NULL"
     ).fetchall()
