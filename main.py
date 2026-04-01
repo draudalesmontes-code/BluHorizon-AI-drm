@@ -3,27 +3,19 @@ from pydantic import BaseModel
 from anthropic import Anthropic
 from config import settings
 
-app = FastAPI()
-client = Anthropic(api_key=settings.anthropic_api_key) 
+from routers.chat import router as chat
+from routers.rag import router as rag
+from routers.agents import router as agents
 
+app = FastAPI(title="Agentic AI API")
 
 @app.get("/")
-def health():
+def health() -> dict:
     return {"status": "ok"}
 
 
-
-@app.post("/chat")
-def chat(message: str):
-    response = client.messages.create(
-        model=settings.claude_model,
-        max_tokens=settings.max_tokens,
-        messages=[{
-            "role":"user",
-            "content":message
-        }]
-    )
-    return {"reply": response.content[0].text}
-
+app.include_router(chat_router, prefix="/chat", tags=["chat"])
+app.include_router(rag_router, prefix="/rag", tags=["rag"])
+app.include_router(agents_router, prefix="/agents", tags=["agents"])
 
 
