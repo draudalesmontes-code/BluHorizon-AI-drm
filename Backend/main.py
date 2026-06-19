@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.chat import router as chat
 from routers.rag import router as rag
 from routers.agents import router as agents
+from routers.auth import router as auth
 
 app = FastAPI(title="Agentic AI API")
 
@@ -25,3 +26,4 @@ def health() -> dict:
 app.include_router(chat, prefix="/chat", tags=["chat"])
 app.include_router(rag, prefix="/rag", tags=["rag"])
 app.include_router(agents, prefix="/agents", tags=["agents"])
+app.include_router(auth, prefix="/auth", tags=["auth"])

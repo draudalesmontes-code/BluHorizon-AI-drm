@@ -1,5 +1,5 @@
-from services.store_faiss_vector import query as vector_query
-from services.store_faiss_vector import get_info
+from services.legacy.store_faiss_vector import query as vector_query
+from services.legacy.store_faiss_vector import get_info
 from services.claude_client import call_claude
 from services.prompt import RAG_SYSTEM_PROMPT, HYDE_SYSTEM_PROMPT
 

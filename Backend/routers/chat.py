@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from config import settings
 from services.claude_client import call_claude
-from services.conversation_store import (
+from services.legacy.conversation_store import (
     append_message,
     clear_session,
     create_session,

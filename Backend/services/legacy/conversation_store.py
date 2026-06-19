@@ -12,7 +12,7 @@ def _data_dir() -> Path:
         docker_dir.mkdir(parents=True, exist_ok=True)
         return docker_dir
 
-    local_dir = Path(__file__).resolve().parents[1] / "faiss_data"
+    local_dir = Path(__file__).resolve().parents[2] / "faiss_data"
     local_dir.mkdir(parents=True, exist_ok=True)
     return local_dir
 

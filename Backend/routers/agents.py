@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.claude_client import call_claude_tools
-from services.conversation_store import (
+from services.legacy.conversation_store import (
     append_message,
     create_session,
     get_history,

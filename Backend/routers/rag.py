@@ -5,11 +5,11 @@ from uuid import uuid4
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from services.conversation_store import init_db, list_documents, upsert_document
+from services.legacy.conversation_store import init_db, list_documents, upsert_document
 from services.file_ingest import extract_text_from_upload
 from services.prompt import generate_system_prompt
 from services.rag_pipeline import rag_query
-from services.store_faiss_vector import add_document, get_info
+from services.legacy.store_faiss_vector import add_document, get_info
 
 router = APIRouter()
 init_db()

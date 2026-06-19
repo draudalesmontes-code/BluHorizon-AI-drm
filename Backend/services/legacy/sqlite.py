@@ -33,13 +33,13 @@ def insert_chunks(chunks: list[dict]) -> None:
     _conn.commit()
 
 def fetch_by_id(chunk_id: int) -> dict | None:
-    row = _conn.execute("SELECT text, source, doc_id FROM chunks WHERE id = ?", 
+    row = _conn.execute("SELECT text, source, doc_id FROM chunks WHERE id = ?",
     (chunk_id,)
     ).fetchone()
 
     if not row:
         return None
-    
+
     return{
         "text":   row[0],
         "source": row[1],
@@ -49,13 +49,13 @@ def fetch_by_id(chunk_id: int) -> dict | None:
 def fetch_by_ids(chunk_ids:list[int]) -> dict[int,dict]:
     if not chunk_ids:
         return {}
-    
+
     placehorder_ids = ",".join("?"*len(chunk_ids))
 
     rows = _conn.execute(f"SELECT id, text, source, doc_id FROM chunks WHERE id IN ({placehorder_ids})"
                   ,chunk_ids
                   ).fetchall()
-    
+
     return{
        row[0]: {
            "text": row[1],
@@ -67,14 +67,11 @@ def fetch_by_ids(chunk_ids:list[int]) -> dict[int,dict]:
 
 
 def delete_by_doc_id(doc_id: str) -> int:
-
     cursor = _conn.execute(
         "DELETE FROM chunks WHERE doc_id = ?",
         (doc_id,)
     )
-
     _conn.commit()
-
     return cursor.rowcount
 
 def get_stats() -> dict:
@@ -87,4 +84,3 @@ def get_stats() -> dict:
         "total_chunks": total,
         "sources":      [r[0] for r in sources]
     }
-

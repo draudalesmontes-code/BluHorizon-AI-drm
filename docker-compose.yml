@@ -1,4 +1,22 @@
 services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Oreoboy4
+      POSTGRES_DB: bluhorizon
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./Backend/database/blu_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./Backend/database/migrations/001_indexes.sql:/docker-entrypoint-initdb.d/02_indexes.sql
+      - ./Backend/database/migrations/002_constraints.sql:/docker-entrypoint-initdb.d/03_constraints.sql
+      - ./Backend/database/migrations/003_cascades.sql:/docker-entrypoint-initdb.d/04_cascades.sql
+      - ./Backend/database/migrations/004_triggers.sql:/docker-entrypoint-initdb.d/05_triggers.sql
+      - ./Backend/database/migrations/005_vector_column.sql:/docker-entrypoint-initdb.d/06_vector_column.sql
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -10,6 +28,8 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    depends_on:
+      - db
 
   frontend:
     build:
@@ -22,3 +42,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+volumes:
+  postgres_data:

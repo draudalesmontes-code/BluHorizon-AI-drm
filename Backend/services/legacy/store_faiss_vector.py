@@ -4,12 +4,12 @@ import numpy as np
 from config import settings
 
 from services.embedding import chunk_text, embed_batch, embed_text
-from services.index_faiss_vector import add_vectors, search
-from services import sqlite
+from services.legacy.index_faiss_vector import add_vectors, search
+from services.legacy import sqlite
 
 def add_document(text: str, metadata: dict =None) -> list[int]:
     metadata = metadata or {}
-    
+
     chunks_of_text = chunk_text(text)
     embedded_results = embed_batch(chunks_of_text)
     list_of_vectors_ids = add_vectors(embedded_results)
@@ -31,7 +31,7 @@ def query(query_text:str, n_results:int) -> list[dict]:
     rows = sqlite.fetch_by_ids([m[0] for m in matches])
 
     results = []
-    for chunk_id, score in matches:   
+    for chunk_id, score in matches:
         row = rows.get(chunk_id)
 
         if not row:
@@ -50,11 +50,6 @@ def query(query_text:str, n_results:int) -> list[dict]:
     return results
 
 def get_info() ->dict:
-    from services.index_faiss_vector import get_stats as faiss_stats
-    from services.sqlite import get_stats as db_stats
+    from services.legacy.index_faiss_vector import get_stats as faiss_stats
+    from services.legacy.sqlite import get_stats as db_stats
     return {**faiss_stats(),**db_stats()}
-
-
-
-
-    
