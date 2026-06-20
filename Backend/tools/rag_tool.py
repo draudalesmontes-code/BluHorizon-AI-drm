@@ -18,10 +18,10 @@ RAG_TOOL_DEFINITION = {
 }
 
 
-async def run_rag(query: str) -> str:
+async def run_rag(query: str, user_id: int) -> str:
 
     from services.rag_pipeline import rag_query
-    result = rag_query(query)
+    result = rag_query(query, user_id)
 
     if not result.get("retrieved_chunks"):
         return "No relevant documents found for this query."

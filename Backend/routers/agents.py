@@ -1,20 +1,19 @@
 from typing import Optional
 
 import anthropic
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+from dependencies import get_current_user
 
 from services.claude_client import call_claude_tools
-from services.legacy.conversation_store import (
+from services.postgres.postgres_store import (
     append_message,
-    create_session,
+    create_conversation,
     get_history,
-    init_db,
 )
 from services.prompt import AGENT_SYSTEM_PROMPT
 
 router = APIRouter()
-init_db()
 
 
 def get_all_tools() -> dict[str, dict]:
@@ -31,7 +30,7 @@ def get_all_tools() -> dict[str, dict]:
 
 class AgentRequest(BaseModel):
     message: str = Field(..., description="User message.")
-    session_id: Optional[str] = Field(None, description="Persistent conversation/session id.")
+    conversation_id: Optional[int] = Field(None, description="Persistent conversation/conversation id.")
     persist: bool = Field(True, description="Whether to save and reuse conversation history.")
     conversation_history: Optional[list[dict]] = Field(None, description="Optional direct history override.")
     use_web_search: bool = Field(True, description="Enable web search tool.")
@@ -51,7 +50,7 @@ class AgentResponse(BaseModel):
     final_answer: str
     tool_calls_made: list[ToolCallLog]
     total_turns: int
-    session_id: str
+    conversation_id: int
 
 
 async def run_agent_loop(
@@ -59,6 +58,7 @@ async def run_agent_loop(
     tools: list[dict],
     system_prompt: str,
     max_tool_calls: int,
+    user_id: int,
     seed_history: Optional[list[dict]] = None,
 ) -> tuple[str, list[ToolCallLog], int]:
     if not tools:
@@ -116,7 +116,7 @@ async def run_agent_loop(
                     tool_output = run_code(tool_input["code"])
                 elif tool_name == "search_documents":
                     from tools.rag_tool import run_rag
-                    tool_output = await run_rag(tool_input["query"])
+                    tool_output = await run_rag(tool_input["query"], user_id)
                 else:
                     tool_output = f"Unknown tool: {tool_name}"
 
@@ -142,25 +142,24 @@ async def run_agent_loop(
 
 
 @router.post("/run", response_model=AgentResponse)
-async def run_agent(request: AgentRequest):
+async def run_agent(request: AgentRequest,  user_id: int = Depends(get_current_user)):
     try:
         all_tools = get_all_tools()
 
-        tools = []
+        # document search is always available — the agent decides when to use it
+        tools = [all_tools["search_documents"]]
         if request.use_web_search:
             tools.append(all_tools["web_search"])
         if request.use_code:
             tools.append(all_tools["execute_python"])
-        if request.use_rag:
-            tools.append(all_tools["search_documents"])
 
         active_prompt = request.system_prompt or AGENT_SYSTEM_PROMPT
-        session_id = request.session_id or create_session()
+        conversation_id = request.conversation_id or create_conversation(user_id)
 
         if request.conversation_history is not None:
             seed_history = request.conversation_history
         elif request.persist:
-            seed_history = get_history(session_id)
+            seed_history = get_history(conversation_id,user_id)
         else:
             seed_history = []
 
@@ -169,18 +168,19 @@ async def run_agent(request: AgentRequest):
             tools=tools,
             system_prompt=active_prompt,
             max_tool_calls=request.max_tool_calls,
+            user_id=user_id,
             seed_history=seed_history,
         )
 
         if request.persist:
-            append_message(session_id, "user", request.message)
-            append_message(session_id, "assistant", final_answer)
+            append_message(conversation_id, "user", request.message)
+            append_message(conversation_id, "assistant", final_answer)
 
         return AgentResponse(
             final_answer=final_answer,
             tool_calls_made=tool_logs,
             total_turns=turns,
-            session_id=session_id,
+            conversation_id=conversation_id,
         )
 
     except Exception as e:
@@ -188,7 +188,7 @@ async def run_agent(request: AgentRequest):
 
 
 @router.get("/tools")
-async def list_tools():
+async def list_tools( user_id: int = Depends(get_current_user)):
     all_tools = get_all_tools()
     return {
         "available_tools": [

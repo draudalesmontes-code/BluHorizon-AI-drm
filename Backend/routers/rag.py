@@ -2,23 +2,23 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import Depends, APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from services.legacy.conversation_store import init_db, list_documents, upsert_document
+from services.postgres.document_store import list_documents, upsert_document
 from services.file_ingest import extract_text_from_upload
 from services.prompt import generate_system_prompt
 from services.rag_pipeline import rag_query
-from services.legacy.store_faiss_vector import add_document, get_info
+from services.postgres.vector_store import add_chunks, get_info
+from dependencies import get_current_user
 
 router = APIRouter()
-init_db()
 
 
 class IngestRequest(BaseModel):
     text: str = Field(..., description="Full document text to index.")
     source: str = Field("manual", description="Where this document came from.")
-    doc_id: str = Field("doc_default", description="Unique identifier for this document.")
+    doc_id: int
 
 
 class IngestResponse(BaseModel):
@@ -29,7 +29,7 @@ class IngestResponse(BaseModel):
 
 class UploadResponse(BaseModel):
     message: str
-    doc_id: str
+    doc_id: int
     filename: str
     file_type: str
     chunks_created: int
@@ -54,19 +54,19 @@ class GeneratePromptRequest(BaseModel):
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest(request: IngestRequest):
+async def ingest(request: IngestRequest, user_id: int = Depends(get_current_user)):
     try:
-        ids = add_document(
-            text=request.text,
-            metadata={"source": request.source, "doc_id": request.doc_id}
+        doc_id = upsert_document(
+            user_id=user_id,
+            filename=request.source,
+            file_type=Path(request.source).suffix.lower(),
         )
 
-        upsert_document(
-            doc_id=request.doc_id,
-            filename=request.source,
-            source=request.source,
-            file_type=Path(request.source).suffix.lower() or "text",
+        ids = add_chunks(
+            text=request.text,
+            document_id=doc_id
         )
+
 
         return IngestResponse(
             message=f"Successfully indexed {request.source}",
@@ -78,7 +78,7 @@ async def ingest(request: IngestRequest):
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), user_id: int = Depends(get_current_user)):
     try:
         text, file_type = await extract_text_from_upload(file)
 
@@ -86,23 +86,19 @@ async def upload_document(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="No readable text found in uploaded file.")
 
         filename = file.filename or "uploaded_file"
-        doc_id = str(uuid4())
 
-        ids = add_document(
-            text=text,
-            metadata={
-                "source": filename,
-                "doc_id": doc_id,
-                "file_type": file_type,
-            }
-        )
-
-        upsert_document(
-            doc_id=doc_id,
+        doc_id = upsert_document(
+            user_id=user_id,
             filename=filename,
-            source=filename,
             file_type=file_type,
         )
+
+        ids = add_chunks(
+            text=text,
+            document_id=doc_id
+        )
+
+
 
         return UploadResponse(
             message=f"Successfully uploaded {filename}",
@@ -120,18 +116,19 @@ async def upload_document(file: UploadFile = File(...)):
 
 
 @router.get("/documents")
-async def documents():
+async def documents(user_id: int = Depends(get_current_user)):
     try:
-        return {"documents": list_documents()}
+        return {"documents": list_documents(user_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Document listing failed: {str(e)}")
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+async def query(request: QueryRequest, user_id: int = Depends(get_current_user)):
     try:
         result = rag_query(
             user_question=request.question,
+            user_id=user_id,
             system_prompt=request.system_prompt
         )
         return QueryResponse(**result)
@@ -140,15 +137,15 @@ async def query(request: QueryRequest):
 
 
 @router.get("/stats")
-async def stats():
+async def stats(user_id: int = Depends(get_current_user)):
     try:
-        return get_info()
+        return get_info(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Stats failed: {str(e)}")
 
 
 @router.post("/generate-prompt")
-async def generate_prompt(request: GeneratePromptRequest):
+async def generate_prompt(request: GeneratePromptRequest, user_id: int = Depends(get_current_user)):
     try:
         prompt = generate_system_prompt(request.use_case)
         return {"generated_prompt": prompt}

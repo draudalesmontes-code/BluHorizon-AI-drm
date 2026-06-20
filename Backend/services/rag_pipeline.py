@@ -1,14 +1,14 @@
-from services.legacy.store_faiss_vector import query as vector_query
-from services.legacy.store_faiss_vector import get_info
+from services.postgres.vector_store import query as vector_query
+from services.postgres.vector_store import get_info
 from services.claude_client import call_claude
 from services.prompt import RAG_SYSTEM_PROMPT, HYDE_SYSTEM_PROMPT
 
-_MIN_GAP     = 0.12
-_FLOOR_SCORE = 0.50
+_MIN_GAP     = 0.08
+_FLOOR_SCORE = 0.10
 _MIN_CHUNKS  = 2
 _MAX_CHUNKS  = 8
-def _get_n_candidates() -> int:
-   index = get_info().get("total_vectors",0)
+def _get_n_candidates(user_id: int) -> int:
+   index = get_info(user_id).get("total_vectors",0)
    if not index:
        return 0
    n_candidates = int(index * 0.2)
@@ -39,9 +39,9 @@ def _dynamic_filtering(candidates: list[dict]) -> list[dict]:
 
     return above_floor[:cut_at]
 
-def rag_query(user_question:str, system_prompt:str| None = None)-> dict:
+def rag_query(user_question:str,  user_id: int, system_prompt:str| None = None)-> dict:
     hypothetical_answer = _generate_hypothetical_answer(user_question)
-    candidate_count = _get_n_candidates()
+    candidate_count = _get_n_candidates(user_id)
     if candidate_count == 0:
         return {
             "answer":           "No documents indexed yet. Please ingest documents first.",
@@ -50,7 +50,7 @@ def rag_query(user_question:str, system_prompt:str| None = None)-> dict:
             "chunks_used":      0,
             "hyde_answer":      hypothetical_answer
         }
-    candidates = vector_query(hypothetical_answer,candidate_count)
+    candidates = vector_query(hypothetical_answer,candidate_count, user_id)
     retrieved = _dynamic_filtering(candidates)
     if not retrieved:
         return{

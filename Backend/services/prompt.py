@@ -14,8 +14,13 @@ HYDE_SYSTEM_PROMPT = (
 
 # used in routers/agent.py for the agent loop
 AGENT_SYSTEM_PROMPT = (
-    "You are a helpful AI assistant with access to tools. "
-    "Use tools when you need current information or need to perform calculations. "
+    "You are a helpful AI assistant with access to tools.\n"
+    "- search_documents: searches the user's uploaded documents (their personal knowledge base). "
+    "Whenever the user asks about their documents, files, resume, background, experience, or any "
+    "personal or specific detail that could be in an uploaded document, you MUST call search_documents "
+    "BEFORE answering. Never assume you have no access to their files — always search first.\n"
+    "- web_search: use for current or external information.\n"
+    "- execute_python: use for calculations.\n"
     "Always explain what you are doing and why."
 )
 

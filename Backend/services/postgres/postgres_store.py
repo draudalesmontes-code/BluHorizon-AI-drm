@@ -23,26 +23,25 @@ def append_message(conversation_id: int, role: str,content: str)-> None:
             ,(conversation_id,role,content))
 
 ## fetch all messages for a conversation ordered oldest to newest
-def get_history(conversation_id: int) -> list[dict]:
+def get_history(conversation_id: int, user_id:int) -> list[dict]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT role, content FROM messages WHERE conversation_id=%s ORDER BY id ASC",
-            (conversation_id,))
+            cur.execute("SELECT m.role, m.content FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE m.conversation_id = %s AND c.user_id =%s ORDER BY m.id ASC",
+            (conversation_id,user_id))
             return [{"role": row["role"], "content": row["content"]} for row in cur.fetchall()]
 
 ## fetches n conversations from conversation table based on input
-def list_conversations(limit: int = 50) -> list[dict]:
+def list_conversations( user_id:int, limit: int = 50) -> list[dict]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT %s",
-            (limit,))
+            cur.execute("SELECT id, title, created_at, updated_at FROM conversations WHERE user_id =%s ORDER BY updated_at DESC LIMIT %s",
+            (user_id,limit))
             return [dict(row) for row in cur.fetchall()]
 
 ## delete a conversation and cascade-delete all its messages
-def clear_conversation(conversation_id: int) -> None:
+def clear_conversation(conversation_id: int, user_id: int) -> None:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("DELETE FROM conversations WHERE id=%s",
-            (conversation_id,))
+            cur.execute("DELETE FROM conversations WHERE id=%s AND user_id =%s",
+            (conversation_id,user_id))
 
-def upsert_document()
