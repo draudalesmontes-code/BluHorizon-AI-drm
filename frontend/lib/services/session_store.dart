@@ -1,16 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Optional persistence for the active conversation id (int, matches the
+/// Postgres `conversations.id`). Currently the chat screen keeps this in
+/// memory; this store is here for when you want it to survive restarts.
 class SessionStore {
-  static const _key = 'chat_session_id';
+  static const _key = 'chat_conversation_id';
 
-  static Future<String?> getSessionId() async {
+  static Future<int?> getConversationId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_key);
+    return prefs.getInt(_key);
   }
 
-  static Future<void> setSessionId(String sessionId) async {
+  static Future<void> setConversationId(int id) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, sessionId);
+    await prefs.setInt(_key, id);
   }
 
   static Future<void> clear() async {

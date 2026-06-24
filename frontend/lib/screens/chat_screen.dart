@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/message.dart';
 import '../services/api_service.dart' as api;
 import 'documents_drawer.dart';
+import 'login_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -24,7 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final List<Message> _messages = [];
-  String? _sessionId;
+  int? _conversationId;
 
   bool _useWebSearch = true;
   bool _useCode = false;
@@ -48,10 +49,10 @@ class _ChatScreenState extends State<ChatScreen> {
         useWebSearch: _useWebSearch,
         useCode: _useCode,
         useRag: _useRag,
-        sessionId: _sessionId,
+        conversationId: _conversationId,
       );
 
-      _sessionId ??= data['session_id'] as String?;
+      _conversationId ??= data['conversation_id'] as int?;
 
       final toolCalls = (data['tool_calls_made'] as List? ?? [])
           .map((t) => ToolCall.fromJson(t as Map<String, dynamic>))
@@ -66,14 +67,27 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       });
+    } on api.UnauthorizedException {
+      await _logout();
+      return;
     } catch (e) {
       setState(() {
         _messages.add(Message(role: 'error', content: e.toString()));
       });
     } finally {
-      setState(() => _loading = false);
-      _scrollToBottom();
+      if (mounted) {
+        setState(() => _loading = false);
+        _scrollToBottom();
+      }
     }
+  }
+
+  Future<void> _logout() async {
+    await api.ApiService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   void _scrollToBottom() {
@@ -121,6 +135,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: const Color(0xFF888888),
               ),
             ),
+          ),
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout, size: 16, color: Color(0xFF888888)),
+            tooltip: 'Log out',
           ),
           const SizedBox(width: 8),
         ],
@@ -307,7 +326,6 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
         border: Border(
           left: BorderSide(color: accentColor, width: 2),
           top: const BorderSide(color: Color(0xFF2A2A2A)),
@@ -381,14 +399,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   activeColor: const Color(0xFFD4FF6E),
                   activeBg: const Color(0xFF162A06),
                   onTap: () => setState(() => _useCode = !_useCode),
-                ),
-                const SizedBox(width: 6),
-                _ToolToggle(
-                  label: 'RAG',
-                  active: _useRag,
-                  activeColor: const Color(0xFFA855F7),
-                  activeBg: const Color(0xFF1A0A2E),
-                  onTap: () => setState(() => _useRag = !_useRag),
                 ),
               ],
             ),
