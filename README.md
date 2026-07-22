@@ -33,6 +33,22 @@ docker-compose.yml
     └── Flutter mobile app
 ```
 
+## Branches
+
+This repository currently has two important branches:
+
+| Branch | Purpose | Notes |
+|--------|---------|-------|
+| `main` | Stable baseline for the current full-stack RAG application | Uses the existing FAISS-based retrieval flow with SQLite/Firebase-era persistence pieces. This is the branch to use when reviewing the original working demo. |
+| `postgres-migration` | Work-in-progress migration toward a production-style Postgres backend | Adds Postgres schema and migration files, seeded SQL data, JWT/auth support, a Flutter login screen, and updated API wiring. This branch is for testing the database/auth refactor before merging it back into `main`. |
+
+### Branch Workflow
+
+- Use `main` for the current stable demo and portfolio review.
+- Use `postgres-migration` when working on the database migration, login flow, JWT handling, or Postgres-backed document/vector storage.
+- Keep feature work on the migration branch until the backend, frontend login flow, Docker setup, and tests are confirmed together.
+- Merge `postgres-migration` into `main` only after the app can run cleanly with Postgres through Docker Compose.
+
 ## Key Features
 
 - **HyDE RAG Pipeline** — generates a hypothetical answer to the user query, embeds it, and uses it for semantic retrieval — improving recall over naive keyword search
