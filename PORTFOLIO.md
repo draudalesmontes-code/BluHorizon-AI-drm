@@ -35,6 +35,17 @@ docker-compose.yml
         └── ViewModels (GPS, Camera)
 ```
 
+## Branch Context
+
+The repository keeps the stable demo and the database migration work separated:
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | Stable portfolio/demo branch for the current FAISS-based RAG application with SQLite/Firebase-era persistence pieces. |
+| `postgres-migration` | Work-in-progress branch for the Postgres migration, JWT/auth flow, Flutter login screen, Docker updates, and Postgres-backed storage refactor. |
+
+This separation keeps the original demo reviewable while the production-style database/auth work is tested before merge.
+
 ## Key Features
 
 - **HyDE RAG Pipeline**: Generates a hypothetical answer to the user query, embeds it, and uses it for semantic retrieval — improving recall over naive keyword search
