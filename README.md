@@ -66,3 +66,21 @@ TAVILY_API_KEY=...
 ```
 
 The backend will be available at `http://localhost:8000` and the Flutter web frontend at `http://localhost:3000`.
+
+## LLM evaluations
+
+From `Backend/`, run the free evaluator/harness tests with:
+
+```bash
+python -m pytest tests/rag_eval_test.py -v -m "not llm_eval"
+```
+
+To run the end-to-end RAG quality cases against Postgres and Claude (uses API
+tokens), start the database, configure `.env`, and opt in explicitly:
+
+```bash
+RUN_LLM_EVALS=1 python -m pytest tests/rag_eval_test.py -v -m llm_eval
+```
+
+Evaluation cases live in `Backend/tests/eval_cases.json`; add cases there to
+expand the benchmark without changing the runner.

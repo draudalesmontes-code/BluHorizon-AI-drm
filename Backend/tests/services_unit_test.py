@@ -15,6 +15,7 @@ import unittest
 import sys
 import os
 import shutil
+from unittest.mock import patch
 
 # add project root to path so imports work
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -290,20 +291,32 @@ class TestRAGPipeline(unittest.TestCase):
     """Test 7 — full RAG pipeline works end to end"""
 
     def setUp(self):
-        from services.legacy.store_faiss_vector import add_document
-        add_document(
-            "Dogs are mammals. They eat meat and dry kibble. "
-            "Dogs live between 10 and 15 years on average.",
-            metadata={"source": "animals.txt", "doc_id": "rag_test_doc"}
-        )
+        self.get_info = patch(
+            "services.rag_pipeline.get_info",
+            return_value={"total_vectors": 10},
+        ).start()
+        self.vector_query = patch(
+            "services.rag_pipeline.vector_query",
+            return_value=[{
+                "text": "Dogs eat meat and dry kibble.",
+                "score": 0.9,
+                "metadata": {"source": "animals.txt"},
+            }],
+        ).start()
+        self.call_claude = patch(
+            "services.rag_pipeline.call_claude",
+            side_effect=["A hypothetical answer", "Dogs eat meat and dry kibble."],
+        ).start()
 
     def tearDown(self):
-        from services.legacy.sqlite import delete_by_doc_id
-        delete_by_doc_id("rag_test_doc")
+        patch.stopall()
+
+    def query(self, question="what do dogs eat?", **kwargs):
+        from services.rag_pipeline import rag_query
+        return rag_query(question, user_id=1, **kwargs)
 
     def test_rag_query_returns_answer(self):
-        from services.rag_pipeline import rag_query
-        result = rag_query("what do dogs eat?")
+        result = self.query()
         self.assertIn("answer",           result)
         self.assertIn("retrieved_chunks", result)
         self.assertIn("sources",          result)
@@ -311,36 +324,30 @@ class TestRAGPipeline(unittest.TestCase):
         self.assertIn("hyde_answer",      result)
 
     def test_rag_query_answer_is_string(self):
-        from services.rag_pipeline import rag_query
-        result = rag_query("what do dogs eat?")
+        result = self.query()
         self.assertIsInstance(result["answer"], str)
         self.assertGreater(len(result["answer"]), 0)
 
     def test_rag_query_chunks_used_within_bounds(self):
-        from services.rag_pipeline import rag_query
-        result = rag_query("what do dogs eat?")
+        result = self.query()
         self.assertGreaterEqual(result["chunks_used"], 0)
         self.assertLessEqual(result["chunks_used"], 8)
 
     def test_rag_query_sources_contains_expected(self):
-        from services.rag_pipeline import rag_query
-        result = rag_query("what do dogs eat?")
+        result = self.query()
         # sources may be empty if dynamic filter cut everything
         # check that if sources exist they contain the expected value
         if result["sources"]:
             self.assertIn("animals.txt", result["sources"])
 
     def test_rag_query_empty_index_returns_message(self):
-        from services.rag_pipeline import rag_query
-        from services.legacy.sqlite import delete_by_doc_id
-        delete_by_doc_id("rag_test_doc")
-        result = rag_query("completely unrelated obscure question xyz123")
+        self.get_info.return_value = {"total_vectors": 0}
+        result = self.query("completely unrelated obscure question xyz123")
         self.assertIsInstance(result["answer"], str)
 
     def test_rag_query_custom_prompt(self):
-        from services.rag_pipeline import rag_query
         custom = "You are a formal academic assistant. Use precise language."
-        result = rag_query("what do dogs eat?", system_prompt=custom)
+        result = self.query(system_prompt=custom)
         self.assertIsInstance(result["answer"], str)
         self.assertGreater(len(result["answer"]), 0)
 
