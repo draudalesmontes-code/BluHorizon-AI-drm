@@ -67,19 +67,44 @@ TAVILY_API_KEY=...
 
 The backend will be available at `http://localhost:8000` and the Flutter web frontend at `http://localhost:3000`.
 
+## Test suite
+
+From `Backend/`, run the grouped backend suite with visible area headers and
+RAG metric output:
+
+```bash
+python3 run_test_suite.py
+```
+
+That master suite calls the service unit tests and the free RAG eval harness.
+It skips paid/live Claude and Postgres-backed checks by default.
+Legacy FAISS tests are skipped automatically if `faiss` is not installed.
+
+To include the live checks, start Postgres, configure your environment, and opt
+in explicitly:
+
+```bash
+python3 run_test_suite.py --include-live
+```
+
+The live RAG quality suite runs every eval case twice: once with HyDE retrieval
+and once with raw-question retrieval. Its metric output includes deterministic
+answer accuracy gates, LLM judge scores, chunks/sources used, and speed timings
+for HyDE generation, retrieval, answer generation, and total RAG time.
+
 ## LLM evaluations
 
 From `Backend/`, run the free evaluator/harness tests with:
 
 ```bash
-python -m pytest tests/rag_eval_test.py -v -m "not llm_eval"
+SHOW_RAG_METRICS=1 python3 -m pytest tests/rag_eval_test.py -v -s -m "not llm_eval"
 ```
 
 To run the end-to-end RAG quality cases against Postgres and Claude (uses API
 tokens), start the database, configure `.env`, and opt in explicitly:
 
 ```bash
-RUN_LLM_EVALS=1 python -m pytest tests/rag_eval_test.py -v -m llm_eval
+RUN_LLM_EVALS=1 SHOW_RAG_METRICS=1 python3 -m pytest tests/rag_eval_test.py -v -s -m llm_eval
 ```
 
 Evaluation cases live in `Backend/tests/eval_cases.json`; add cases there to
