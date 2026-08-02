@@ -1,0 +1,13 @@
+# Dependencies for Backend/run_test_suite.py without legacy FAISS.
+pytest>=8.0,<9.0
+anthropic==0.40.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+torch==2.11.0
+sentence-transformers==3.3.1
+numpy==1.26.4
+tiktoken==0.8.0
+psycopg2-binary
+pgvector
+passlib[bcrypt]
+bcrypt==4.0.1

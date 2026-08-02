@@ -55,17 +55,28 @@ User query
 ## Getting Started
 
 ```bash
-docker-compose up --build
+cp .env.example .env
+# Fill in ANTHROPIC_API_KEY, TAVILY_API_KEY if needed, and SECRET_KEY.
+docker compose up --build
 ```
 
-Set the following environment variables before running:
+The Docker image uses Python 3.11 and installs the pinned Python dependencies
+from `requirements.txt`. `docker-compose.yml` also provides safe placeholder
+defaults so a fresh pull can build and boot before real API tokens are added.
+The Compose Postgres database is exposed on host port `55432` to avoid
+conflicts with a local macOS Postgres on `5432`.
+
+Set the following environment variables in `.env` before running live AI
+features:
 
 ```
 ANTHROPIC_API_KEY=...
 TAVILY_API_KEY=...
+SECRET_KEY=...
+POSTGRES_PASSWORD=local_dev_password
 ```
 
-The backend will be available at `http://localhost:8000` and the Flutter web frontend at `http://localhost:3000`.
+The backend will be available at `http://localhost:8000` and the Flutter web frontend at `http://localhost:3001`.
 
 ## Test suite
 
@@ -74,6 +85,24 @@ RAG metric output:
 
 ```bash
 python3 run_test_suite.py
+```
+
+Current active backend pytest coverage is 49 collected cases in `Backend/tests`:
+36 service tests and 13 RAG eval tests. The RAG eval total is 5 free harness
+checks plus 8 live quality checks, covering 4 eval cases across HyDE and
+raw-question retrieval. `Backend/test_all.py` also contains 11 older manual
+smoke checks, but it is not part of the master runner.
+
+For local macOS runs, use Python 3.12 and install the eval/test dependencies
+without legacy FAISS:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.eval.txt
+cd Backend
+python run_test_suite.py --include-live
 ```
 
 That master suite calls the service unit tests and the free RAG eval harness.
@@ -85,6 +114,13 @@ in explicitly:
 
 ```bash
 python3 run_test_suite.py --include-live
+```
+
+You can run the same suite inside Docker after the image is built:
+
+```bash
+docker compose run --rm api python run_test_suite.py
+docker compose run --rm api python run_test_suite.py --include-live
 ```
 
 The live RAG quality suite runs every eval case twice: once with HyDE retrieval

@@ -20,7 +20,13 @@ from pathlib import Path
 
 
 BACKEND_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = BACKEND_ROOT.parent
 PLACEHOLDER_VALUES = {"", "replace_me", "replace-me", "your_token_here", "paste_token_here"}
+PYTEST_MODULE = "pytest"
+INSTALL_HELP = (
+    f"Install test dependencies from repo root ({REPO_ROOT}) with: "
+    f"{Path(sys.executable).name} -m pip install -r requirements.eval.txt"
+)
 
 
 def read_env_files() -> dict[str, str]:
@@ -126,7 +132,7 @@ def run_suite(suite: Suite) -> SuiteResult:
     if missing_modules:
         details = "missing Python modules: " + ", ".join(missing_modules)
         print(f"FAIL: {details}", flush=True)
-        print("Install dependencies from repo root with: python3 -m pip install -r requirements.txt")
+        print(INSTALL_HELP)
         return SuiteResult(suite.name, "FAIL", 0.0, details)
 
     start = time.monotonic()
@@ -152,10 +158,12 @@ def default_suites() -> list[Suite]:
             ),
             args=["-m", "pytest", "tests/services_unit_test.py", "-v"],
             required_modules=(
+                PYTEST_MODULE,
                 "anthropic",
                 "numpy",
                 "pgvector",
                 "psycopg2",
+                "pydantic_settings",
                 "sentence_transformers",
                 "tiktoken",
             ),
@@ -176,6 +184,7 @@ def default_suites() -> list[Suite]:
                 "not llm_eval",
             ],
             env={"SHOW_RAG_METRICS": "1"},
+            required_modules=(PYTEST_MODULE,),
         ),
     ]
 
@@ -188,7 +197,7 @@ def live_suites() -> list[Suite]:
             args=["-m", "pytest", "tests/services_unit_test.py::TestClaudeClient", "-v"],
             env={"RUN_LLM_EVALS": "1"},
             required_env=("ANTHROPIC_API_KEY",),
-            required_modules=("anthropic",),
+            required_modules=(PYTEST_MODULE, "anthropic", "pydantic_settings"),
         ),
         Suite(
             name="Live RAG Hyde Vs No-Hyde Quality Eval",
@@ -208,11 +217,14 @@ def live_suites() -> list[Suite]:
             env={"RUN_LLM_EVALS": "1", "SHOW_RAG_METRICS": "1"},
             required_env=("ANTHROPIC_API_KEY", "DATABASE_URL"),
             required_modules=(
+                PYTEST_MODULE,
                 "anthropic",
                 "numpy",
                 "psycopg2",
                 "pgvector",
+                "passlib",
                 "sentence_transformers",
+                "pydantic_settings",
                 "tiktoken",
             ),
         ),

@@ -3,10 +3,10 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Oreoboy4
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_password}
       POSTGRES_DB: bluhorizon
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./Backend/database/blu_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
@@ -25,8 +25,16 @@ services:
       - "8000:8000"
     volumes:
       - ./Backend/faiss_data:/app/faiss_data
-    env_file:
-      - .env
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-replace_me}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-replace_me}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:local_dev_password@db:5432/bluhorizon}
+      SECRET_KEY: ${SECRET_KEY:-replace_me_with_any_long_random_string}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5}
+      MAX_TOKENS: ${MAX_TOKENS:-4096}
+      FAISS_INDEX_PATH: ${FAISS_INDEX_PATH:-./faiss_data}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
     restart: unless-stopped
     depends_on:
       - db
