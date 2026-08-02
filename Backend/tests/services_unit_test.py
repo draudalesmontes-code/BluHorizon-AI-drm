@@ -15,10 +15,13 @@ import unittest
 import sys
 import os
 import shutil
+import importlib.util
 from unittest.mock import patch
 
 # add project root to path so imports work
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+_FAISS_AVAILABLE = importlib.util.find_spec("faiss") is not None
 
 # clear stale FAISS data before running tests
 # FAISS saves to disk — old vectors from previous runs leak into new tests
@@ -147,6 +150,7 @@ class TestSQLite(unittest.TestCase):
         self.assertIsInstance(stats["sources"],      list)
 
 
+@unittest.skipUnless(_FAISS_AVAILABLE, "faiss is not installed; skipping legacy FAISS tests")
 class TestFAISS(unittest.TestCase):
     """Test 4 — FAISS stores vectors and searches correctly"""
 
@@ -210,6 +214,7 @@ class TestFAISS(unittest.TestCase):
         self.assertEqual(stats["embedding_dim"], 384)
 
 
+@unittest.skipUnless(_FAISS_AVAILABLE, "faiss is not installed; skipping legacy FAISS vector store tests")
 class TestVectorStore(unittest.TestCase):
     """Test 5 — vector store orchestrates FAISS + SQLite correctly"""
 
@@ -256,6 +261,10 @@ class TestVectorStore(unittest.TestCase):
         self.assertIn("sources",       info)
 
 
+@unittest.skipUnless(
+    os.getenv("RUN_LLM_EVALS") == "1",
+    "set RUN_LLM_EVALS=1 to run live Claude client tests",
+)
 class TestClaudeClient(unittest.TestCase):
     """Test 6 — Claude API calls work correctly"""
 
@@ -322,6 +331,7 @@ class TestRAGPipeline(unittest.TestCase):
         self.assertIn("sources",          result)
         self.assertIn("chunks_used",      result)
         self.assertIn("hyde_answer",      result)
+        self.assertIn("metrics",          result)
 
     def test_rag_query_answer_is_string(self):
         result = self.query()
@@ -350,6 +360,27 @@ class TestRAGPipeline(unittest.TestCase):
         result = self.query(system_prompt=custom)
         self.assertIsInstance(result["answer"], str)
         self.assertGreater(len(result["answer"]), 0)
+
+    def test_rag_query_reports_timing_metrics(self):
+        result = self.query()
+        metrics = result["metrics"]
+        self.assertEqual(metrics["retrieval_strategy"], "hyde")
+        self.assertTrue(metrics["use_hyde"])
+        self.assertIn("hyde_latency_seconds", metrics)
+        self.assertIn("retrieval_latency_seconds", metrics)
+        self.assertIn("answer_generation_latency_seconds", metrics)
+        self.assertIn("total_latency_seconds", metrics)
+        self.assertGreaterEqual(metrics["total_latency_seconds"], 0.0)
+
+    def test_rag_query_without_hyde_uses_raw_question(self):
+        self.call_claude.side_effect = ["Dogs eat meat and dry kibble."]
+        result = self.query(use_hyde=False)
+        self.assertEqual(result["hyde_answer"], "")
+        self.assertEqual(result["metrics"]["retrieval_strategy"], "raw_question")
+        self.assertFalse(result["metrics"]["use_hyde"])
+        self.assertEqual(result["metrics"]["hyde_latency_seconds"], 0.0)
+        self.assertEqual(self.vector_query.call_args.args[0], "what do dogs eat?")
+        self.assertEqual(self.call_claude.call_count, 1)
 
 
 # ── Inline runner ──────────────────────────────────────────────────────────

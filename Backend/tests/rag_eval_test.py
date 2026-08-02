@@ -3,7 +3,7 @@
 Fast evaluator tests run on every pytest invocation. Live evaluations are opt-in
 because they use Postgres, embeddings, and the Anthropic API::
 
-    RUN_LLM_EVALS=1 python -m pytest tests/rag_eval_test.py -v -m llm_eval
+    RUN_LLM_EVALS=1 SHOW_RAG_METRICS=1 python3 -m pytest tests/rag_eval_test.py -v -s -m llm_eval
 
 Run from the Backend directory. The live suite seeds and removes its own users.
 """
@@ -23,6 +23,24 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 CASES_PATH = Path(__file__).with_name("eval_cases.json")
 RUN_LIVE = os.getenv("RUN_LLM_EVALS") == "1"
+SHOW_METRICS = os.getenv("SHOW_RAG_METRICS") == "1"
+RAG_MODES = (
+    {"name": "hyde", "use_hyde": True, "strategy": "hyde"},
+    {"name": "no_hyde", "use_hyde": False, "strategy": "raw_question"},
+)
+
+
+def emit_metric(area: str, case_id: str, payload: dict) -> None:
+    if not SHOW_METRICS:
+        return
+    print(f"\n--- {area}: {case_id} ---")
+    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+
+
+def preview(text: str, limit: int = 500) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
 
 
 def load_cases() -> list[dict]:
@@ -101,11 +119,13 @@ class TestEvalHarness:
     def test_deterministic_scorer_accepts_good_answers(self):
         for case in load_cases():
             result = score_answer(case["passing_example"], case)
+            emit_metric("RAG deterministic scorer", case["id"], result)
             assert result["passed"], f"{case['id']}: {result}"
 
     def test_deterministic_scorer_rejects_bad_answers(self):
         for case in load_cases():
             result = score_answer(case["failing_example"], case)
+            emit_metric("RAG deterministic scorer expected rejection", case["id"], result)
             assert not result["passed"], f"{case['id']} unexpectedly passed"
 
     def test_judge_parser_accepts_json_code_fence(self):
@@ -142,13 +162,38 @@ class TestLiveRAGEval:
                 cursor.execute("DELETE FROM users WHERE id = %s", (row[0],))
 
     @pytest.mark.parametrize("case", load_cases(), ids=lambda case: case["id"])
-    def test_rag_quality(self, case):
+    @pytest.mark.parametrize("mode", RAG_MODES, ids=lambda mode: mode["name"])
+    def test_rag_quality(self, case, mode):
         from services.claude_client import call_claude
         from services.rag_pipeline import rag_query
 
-        result = rag_query(case["question"], self.user_id)
+        result = rag_query(case["question"], self.user_id, use_hyde=mode["use_hyde"])
         answer = result["answer"]
         deterministic = score_answer(answer, case)
+        timing = result.get("metrics", {})
+        emit_metric(
+            f"Live RAG {mode['name']} accuracy and speed",
+            case["id"],
+            {
+                "mode": mode["name"],
+                "answer_preview": preview(answer),
+                "chunks_used": result["chunks_used"],
+                "sources": result["sources"],
+                "chunk_scores": [
+                    chunk.get("score") for chunk in result.get("retrieved_chunks", [])
+                ],
+                "timing_seconds": {
+                    "hyde": timing.get("hyde_latency_seconds"),
+                    "candidate_count": timing.get("candidate_count_latency_seconds"),
+                    "retrieval": timing.get("retrieval_latency_seconds"),
+                    "answer_generation": timing.get("answer_generation_latency_seconds"),
+                    "total": timing.get("total_latency_seconds"),
+                },
+                "deterministic": deterministic,
+            },
+        )
+        assert timing["retrieval_strategy"] == mode["strategy"]
+        assert timing["total_latency_seconds"] >= timing["retrieval_latency_seconds"]
         assert deterministic["passed"], deterministic
 
         raw_judgment = call_claude(
@@ -156,6 +201,7 @@ class TestLiveRAGEval:
             "You are a strict LLM evaluator. Output valid JSON only.",
         )
         judgment = parse_judge_result(raw_judgment)
+        emit_metric(f"Live RAG {mode['name']} LLM judge", case["id"], judgment)
         assert all(judgment[key] == 1 for key in ("correct", "grounded", "instruction_safe", "honest")), judgment
         assert result["chunks_used"] <= 8
         assert result["sources"]

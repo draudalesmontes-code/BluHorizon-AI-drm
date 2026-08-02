@@ -39,6 +39,7 @@ class UploadResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str = Field(..., description="Question to answer using indexed documents.")
     system_prompt: Optional[str] = Field(None, description="Optional custom system prompt.")
+    use_hyde: bool = Field(True, description="Use HyDE query expansion before retrieval.")
 
 
 class QueryResponse(BaseModel):
@@ -47,6 +48,7 @@ class QueryResponse(BaseModel):
     sources: list[str]
     chunks_used: int
     hyde_answer: str
+    metrics: dict = Field(default_factory=dict)
 
 
 class GeneratePromptRequest(BaseModel):
@@ -129,7 +131,8 @@ async def query(request: QueryRequest, user_id: int = Depends(get_current_user))
         result = rag_query(
             user_question=request.question,
             user_id=user_id,
-            system_prompt=request.system_prompt
+            system_prompt=request.system_prompt,
+            use_hyde=request.use_hyde,
         )
         return QueryResponse(**result)
     except Exception as e:
